@@ -1,0 +1,9 @@
+include "base/Position.fbs";
+
+namespace motis.footpaths;
+
+table FootpathsTrack {
+  id: int;
+  pos: motis.Position;
+  name: string;
+}

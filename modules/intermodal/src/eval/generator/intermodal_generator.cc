@@ -69,7 +69,7 @@ struct generator_settings : public conf::configuration {
           "  ontrip_train = start in train\n"
           "  intermodal_pretrip = interval at coordinate\n"
           "  intermodal_ontrip = start time at station");
-    param(start_type_, "dest_type", "destination type: coordinate|station");
+    param(dest_type_, "dest_type", "destination type: coordinate|station");
     param(routers_, "routers", "routing targets");
   }
 
@@ -297,7 +297,7 @@ std::vector<fbs::Offset<ModeWrapper>> create_modes(
       v.emplace_back(CreateModeWrapper(
           fbb, Mode_FootPPR,
           CreateFootPPR(fbb,
-                        CreateSearchOptions(fbb, fbb.CreateString("default"),
+                        CreateSearchOptions(fbb, fbb.CreateString("wheelchair"),
                                             60 * m.get_param(0, 15)))
               .Union()));
     } else if (m.name_ == "osrm_foot") {
@@ -313,7 +313,7 @@ std::vector<fbs::Offset<ModeWrapper>> create_modes(
       v.emplace_back(CreateModeWrapper(
           fbb, Mode_CarParking,
           CreateCarParking(fbb, 60 * m.get_param(0, 15),
-                           CreateSearchOptions(fbb, fbb.CreateString("default"),
+                           CreateSearchOptions(fbb, fbb.CreateString("wheelchair"),
                                                60 * m.get_param(1, 10)))
               .Union()));
     } else if (m.name_ == "gbfs") {
@@ -403,7 +403,8 @@ void write_query(schedule const& sched, point_generator& point_gen, int id,
                 fbb.CreateVector(create_modes(fbb, start_modes)),
                 destination_type, get_destination(fbb),
                 fbb.CreateVector(create_modes(fbb, dest_modes)),
-                SearchType_Default, dir, fbb.CreateString(router))
+                SearchType_Default, dir, fbb.CreateString(router),
+                CreateSearchOptions(fbb, fbb.CreateString("wheelchair"), 60)) //TODO: Vielleicht Random Werte generieren?
                 .Union(),
             "/intermodal", DestinationType_Module, id);
       }
@@ -434,7 +435,8 @@ void write_query(schedule const& sched, point_generator& point_gen, int id,
                                          fbb.CreateString(""))
                           .Union(),
                 fbb.CreateVector(create_modes(fbb, dest_modes)),
-                SearchType_Default, dir, fbb.CreateString(router))
+                SearchType_Default, dir, fbb.CreateString(router),
+                CreateSearchOptions(fbb, fbb.CreateString("wheelchair"), 60)) //TODO: Vielleicht Random Werte generieren?
                 .Union(),
             "/intermodal", DestinationType_Module, id);
       }
@@ -477,7 +479,8 @@ void write_query(schedule const& sched, point_generator& point_gen, int id,
                 fbb.CreateVector(create_modes(fbb, start_modes)),
                 destination_type, get_destination(fbb),
                 fbb.CreateVector(create_modes(fbb, dest_modes)),
-                SearchType_Default, dir, fbb.CreateString(router))
+                SearchType_Default, dir, fbb.CreateString(router),
+                CreateSearchOptions(fbb, fbb.CreateString("wheelchair"), 60)) //TODO: Vielleicht Random Werte generieren?
                 .Union(),
             "/intermodal", DestinationType_Module, id);
       }
@@ -501,7 +504,8 @@ void write_query(schedule const& sched, point_generator& point_gen, int id,
                 fbb.CreateVector(create_modes(fbb, start_modes)),
                 destination_type, get_destination(fbb),
                 fbb.CreateVector(create_modes(fbb, dest_modes)),
-                SearchType_Default, dir, fbb.CreateString(router))
+                SearchType_Default, dir, fbb.CreateString(router),
+                CreateSearchOptions(fbb, fbb.CreateString("wheelchair"), 60)) //TODO: Vielleicht Random Werte generieren?
                 .Union(),
             "/intermodal", DestinationType_Module, id);
       }
@@ -523,7 +527,8 @@ void write_query(schedule const& sched, point_generator& point_gen, int id,
                 fbb.CreateVector(create_modes(fbb, start_modes)),
                 destination_type, get_destination(fbb),
                 fbb.CreateVector(create_modes(fbb, dest_modes)),
-                SearchType_Default, dir, fbb.CreateString(router))
+                SearchType_Default, dir, fbb.CreateString(router),
+                CreateSearchOptions(fbb, fbb.CreateString("wheelchair"), 60)) //TODO: Vielleicht Random Werte generieren?
                 .Union(),
             "/intermodal", DestinationType_Module, id);
       }

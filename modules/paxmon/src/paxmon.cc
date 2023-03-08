@@ -461,7 +461,8 @@ msg_ptr initial_reroute_query(schedule const& sched,
           SearchType_Default, SearchDir_Forward,
           fbb.CreateVector(std::vector<flatbuffers::Offset<Via>>{}),
           fbb.CreateVector(
-              std::vector<flatbuffers::Offset<AdditionalEdgeWrapper>>{}))
+              std::vector<flatbuffers::Offset<AdditionalEdgeWrapper>>{}),
+          ppr::CreateSearchOptions(fbb, fbb.CreateString("default"), 60))
           .Union(),
       router);
   return make_msg(fbb);

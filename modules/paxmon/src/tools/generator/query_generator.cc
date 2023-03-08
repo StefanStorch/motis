@@ -130,7 +130,8 @@ msg_ptr make_routing_request(std::string const& from_eva,
           CreateInputStation(fbb, fbb.CreateString(to_eva),
                              fbb.CreateString("")),
           SearchType_Default, dir, fbb.CreateVector(std::vector<Offset<Via>>()),
-          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()))
+          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()),
+          ppr::CreateSearchOptions(fbb, fbb.CreateString("default"), 60)) //TODO: Vielleicht Random Werte generieren?
           .Union(),
       target);
   return make_msg(fbb);

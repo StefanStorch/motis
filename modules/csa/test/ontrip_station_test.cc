@@ -51,7 +51,8 @@ TEST_P(csa_ontrip_station, simple_fwd) {  // NOLINT
                              fbb.CreateString("")),
           std::get<SEARCH_TYPE>(GetParam()), SearchDir_Forward,
           fbb.CreateVector(std::vector<Offset<Via>>()),
-          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()))
+          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()),
+          ppr::CreateSearchOptions(fbb, fbb.CreateString("default"), 60))
           .Union(),
       std::get<TARGET>(GetParam()));
   auto const msg = call(make_msg(fbb));
@@ -97,7 +98,8 @@ TEST_P(csa_ontrip_station, simple_bwd) {  // NOLINT
                              fbb.CreateString("")),
           std::get<SEARCH_TYPE>(GetParam()), SearchDir_Backward,
           fbb.CreateVector(std::vector<Offset<Via>>()),
-          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()))
+          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()),
+          ppr::CreateSearchOptions(fbb, fbb.CreateString("default"), 60))
           .Union(),
       std::get<TARGET>(GetParam()));
   auto const msg = call(make_msg(fbb));
@@ -140,7 +142,8 @@ TEST_P(csa_ontrip_station, interchange_fwd) {  // NOLINT
                              fbb.CreateString("")),
           std::get<SEARCH_TYPE>(GetParam()), SearchDir_Forward,
           fbb.CreateVector(std::vector<Offset<Via>>()),
-          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()))
+          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()),
+          ppr::CreateSearchOptions(fbb, fbb.CreateString("default"), 60))
           .Union(),
       std::get<TARGET>(GetParam()));
   auto const msg = call(make_msg(fbb));
@@ -165,7 +168,8 @@ TEST_P(csa_ontrip_station, interchange_fwd_pretrip) {  // NOLINT
                              fbb.CreateString("")),
           std::get<SEARCH_TYPE>(GetParam()), SearchDir_Forward,
           fbb.CreateVector(std::vector<Offset<Via>>()),
-          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()))
+          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()),
+          ppr::CreateSearchOptions(fbb, fbb.CreateString("default"), 60))
           .Union(),
       std::get<TARGET>(GetParam()));
   auto const msg = call(make_msg(fbb));

@@ -90,7 +90,8 @@ msg_ptr get_routing_request(time_t const from, time_t const to,
                              fbb.CreateString("")),
           SearchType_SingleCriterion, SearchDir_Forward,
           fbb.CreateVector(std::vector<Offset<Via>>{}),
-          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>{}))
+          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>{}),
+          ppr::CreateSearchOptions(fbb, fbb.CreateString("default"), 60)) // TODO: Random Wert generieren?
           .Union(),
       "/routing", DestinationType_Topic);
   return make_msg(fbb);

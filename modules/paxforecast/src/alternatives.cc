@@ -66,7 +66,8 @@ msg_ptr ontrip_train_query(universe const& uv, schedule const& sched,
               fbb.CreateString("")),
           SearchType_Default, SearchDir_Forward,
           fbb.CreateVector(std::vector<Offset<Via>>()),
-          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()), true,
+          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()),
+          ppr::CreateSearchOptions(fbb, fbb.CreateString("default"), 60), true,
           true, true, get_schedule_id(uv))
           .Union(),
       "/routing");
@@ -98,7 +99,8 @@ msg_ptr ontrip_station_query(universe const& uv, schedule const& sched,
               fbb.CreateString("")),
           SearchType_Default, SearchDir_Forward,
           fbb.CreateVector(std::vector<Offset<Via>>()),
-          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()), true,
+          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()),
+          ppr::CreateSearchOptions(fbb, fbb.CreateString("default"), 60), true,
           true, true, get_schedule_id(uv))
           .Union(),
       "/routing");
@@ -134,7 +136,8 @@ msg_ptr pretrip_station_query(universe const& uv, schedule const& sched,
               fbb.CreateString("")),
           SearchType_Default, SearchDir_Forward,
           fbb.CreateVector(std::vector<Offset<Via>>()),
-          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()), true,
+          fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()),
+          ppr::CreateSearchOptions(fbb, fbb.CreateString("default"), 60), true,
           true, true, get_schedule_id(uv))
           .Union(),
       "/routing");

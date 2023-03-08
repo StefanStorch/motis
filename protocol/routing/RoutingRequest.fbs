@@ -2,6 +2,7 @@ include "base/Interval.fbs";
 include "base/Station.fbs";
 include "base/TripId.fbs";
 include "base/SearchDir.fbs";
+include "ppr/SearchOptions.fbs";
 
 namespace motis.routing;
 
@@ -110,6 +111,7 @@ table RoutingRequest {
   search_dir:motis.SearchDir;
   via:[Via];
   additional_edges:[AdditionalEdgeWrapper];
+  transfer_ppr_options: ppr.SearchOptions;
   use_start_metas: bool = true;
   use_dest_metas: bool = true;
   use_start_footpaths: bool = true;

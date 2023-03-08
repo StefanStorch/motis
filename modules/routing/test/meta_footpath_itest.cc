@@ -41,7 +41,8 @@ struct meta_fp_start_label_generation : public motis_instance_test {
                                fbb.CreateString("")),
             SearchType_SingleCriterion, SearchDir_Forward,
             fbb.CreateVector(std::vector<Offset<Via>>()),
-            fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()))
+            fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()),
+            ppr::CreateSearchOptions(fbb, fbb.CreateString("default"), 60))
             .Union(),
         "/routing");
     return make_msg(fbb);

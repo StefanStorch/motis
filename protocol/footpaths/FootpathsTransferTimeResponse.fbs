@@ -1,0 +1,7 @@
+include "ppr/Route.fbs";
+
+namespace motis.footpaths;
+
+table FootpathsTransferTimeResponse {
+  walk: motis.ppr.Route;
+}

@@ -1,0 +1,19 @@
+namespace motis.footpaths;
+
+table TransferEdge {
+  start_track: string;
+  end_track: string;
+  duration: ushort;
+  accessibility: ushort;
+  distance: double;
+}
+
+table Transfers {
+  station_id: int;
+  station_name: string;
+  search_profile: string;
+  transfers_intern: [TransferEdge];
+  transfers_extern: [TransferEdge];
+}
+
+root_type Transfers;

@@ -54,6 +54,16 @@ location to_location(Position const* pos) {
 
 Position to_position(location const& loc) { return {loc.lat(), loc.lon()}; }
 
+osm_type to_osm_type(OsmType type) {
+  switch(type) {
+    case(OsmType_NODE): return osm_type::NODE;
+    case(OsmType_WAY): return osm_type::EDGE;
+    case(OsmType_RELATION): return osm_type::AREA;
+    default: return osm_type::UNKNOWN;
+  }
+}
+
+
 Offset<Polyline> write_polyline(FlatBufferBuilder& fbb,
                                 std::vector<location> const& path) {
   std::vector<double> polyline;
@@ -155,6 +165,7 @@ struct ppr::impl {
     switch (msg->get()->content_type()) {
       case MsgContent_FootRoutingRequest: return route_normal(msg);
       case MsgContent_FootRoutingSimpleRequest: return route_simple(msg);
+      case MsgContent_FootRoutingIdRequest: return route_id(msg);
       default:
         LOG(motis::logging::error) << "/ppr/route: unexpected message type: "
                                    << msg->get()->content_type();
@@ -238,6 +249,52 @@ private:
                                                     include_edges,
                                                     include_path);
                                               })))
+            .Union());
+    return make_msg(fbb);
+  }
+
+  msg_ptr route_id(msg_ptr const& msg) {
+    auto const req = motis_content(FootRoutingIdRequest, msg);
+
+    auto start = to_location(req->start());
+    std::vector<location> destinations;
+    for (auto const& dest : *req->destinations()) {
+      destinations.emplace_back(to_location(dest));
+    }
+    auto start_id = req->start_id();
+    auto start_type = to_osm_type(req->start_type());
+
+    std::vector<int64_t> destination_ids;
+    for (auto const& dest : *req->destination_ids()) {
+      destination_ids.emplace_back(dest);
+    }
+
+    std::vector<osm_type> destination_types;
+    for (auto const& type : *req->destination_types()) {
+      destination_types.emplace_back(to_osm_type((OsmType)type));
+    }
+
+    auto const profile = get_search_profile(req->search_options());
+    auto const dir = req->search_direction() == SearchDir_Forward
+                         ? search_direction::FWD
+                         : search_direction::BWD;
+
+    search_result result = find_routes(rg_, start_id, start_type, start,
+                                       destination_ids, destination_types,
+                                       destinations, profile, dir);
+    message_creator fbb;
+    auto const include_steps = req->include_steps();
+    auto const include_edges = req->include_edges();
+    auto const include_path = req->include_path();
+    fbb.create_and_finish(
+        MsgContent_FootRoutingResponse,
+        CreateFootRoutingResponse(
+            fbb, fbb.CreateVector(utl::to_vec(
+                     result.routes_,
+                     [&](std::vector<struct route> const& rs) {
+                       return write_routes(fbb, rs, include_steps,
+                                           include_edges, include_path);
+                     })))
             .Union());
     return make_msg(fbb);
   }

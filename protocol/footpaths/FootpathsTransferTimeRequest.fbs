@@ -1,0 +1,8 @@
+include "base/Position.fbs";
+
+namespace motis.footpaths;
+
+table FootpathsTransferTimeRequest {
+  pos: motis.Position;
+  radius: double;
+}

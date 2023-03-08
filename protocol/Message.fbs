@@ -1,5 +1,8 @@
 include "address/AddressRequest.fbs";
 include "address/AddressResponse.fbs";
+include "footpaths/FootpathsTransferTimeRequest.fbs";
+include "footpaths/FootpathsTransferTimeResponse.fbs";
+include "footpaths/FootpathsTrack.fbs";
 include "gbfs/GBFSRoutingRequest.fbs";
 include "gbfs/GBFSRoutingResponse.fbs";
 include "gbfs/GBFSProvidersResponse.fbs";
@@ -49,6 +52,7 @@ include "path/PathByTripIdBatchRequest.fbs";
 include "path/PathByTripIdBatchResponse.fbs";
 include "path/PathByTripIdRequest.fbs";
 include "path/PathSeqResponse.fbs";
+include "ppr/FootRoutingIdRequest.fbs";
 include "ppr/FootRoutingProfilesResponse.fbs";
 include "ppr/FootRoutingRequest.fbs";
 include "ppr/FootRoutingResponse.fbs";
@@ -304,7 +308,11 @@ union MsgContent {
   motis.paxmon.PaxMonDebugGraphRequest                                    = 141,
   motis.paxmon.PaxMonDebugGraphResponse                                   = 142,
   motis.paxmon.PaxMonGetUniversesResponse                                 = 143,
-  motis.import.NigiriEvent                                                = 144
+  motis.import.NigiriEvent                                                = 144,
+  motis.footpaths.FootpathsTransferTimeRequest                            = 145,
+  motis.footpaths.FootpathsTransferTimeResponse                           = 146,
+  motis.footpaths.FootpathsTrack                                          = 147,
+  motis.ppr.FootRoutingIdRequest                                          = 148
 }
 
 // Destination Examples:

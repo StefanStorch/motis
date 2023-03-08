@@ -51,9 +51,9 @@
   branch=motis
   commit=9a99a76683897dd27a87fe27ee61d2cfc7034545
 [ppr]
-  url=git@github.com:motis-project/ppr.git
+  url=git@github.com:StefanStorch/ppr.git
   branch=master
-  commit=e92e23a42d9883dcc9806d7ae027fb8febd11175
+  commit=a00103de38930ed33b9c806028630bc2d83a4ec8
 [protobuf]
   url=git@github.com:motis-project/protobuf.git
   branch=master
@@ -95,9 +95,9 @@
   branch=master
   commit=5e6efe17f52a66da36994d1c6ae28e1280e0bc4f
 [nigiri]
-  url=git@github.com:motis-project/nigiri.git
+  url=git@github.com:StefanStorch/nigiri.git
   branch=master
-  commit=cebc43667e2b33f3572cd372fbd62a987f66d2a0
+  commit=32ac65ddff89294cbb03decc596584582be3c28d
 [osmium]
   url=git@github.com:motis-project/libosmium.git
   branch=master

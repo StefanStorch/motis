@@ -43,6 +43,7 @@ struct tripbased_meta_footpath : public motis_instance_test {
             SearchType_Default, SearchDir_Forward,
             fbb.CreateVector(std::vector<Offset<Via>>()),
             fbb.CreateVector(std::vector<Offset<AdditionalEdgeWrapper>>()),
+            ppr::CreateSearchOptions(fbb, fbb.CreateString("default"), 60),
             true, true, true)
             .Union(),
         "/tripbased");

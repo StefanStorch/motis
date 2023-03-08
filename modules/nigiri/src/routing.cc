@@ -253,7 +253,12 @@ motis::module::msg_ptr route(std::vector<std::string> const& tags,
       .max_transfers_ = n::routing::kMaxTransfers,
       .min_connection_count_ = 0U,
       .extend_interval_earlier_ = false,
-      .extend_interval_later_ = false};
+      .extend_interval_later_ = false,
+      .wheelchair_profile_ = req->transfer_ppr_options()->profile()->str().starts_with("wheelchair"),
+      .profile_index_ = static_cast<uint8_t>(tt.locations_.profile_.find(req->transfer_ppr_options()->profile()->str()) != tt.locations_.profile_.end()
+                          ? tt.locations_.profile_.at(req->transfer_ppr_options()->profile()->str())
+                          : 0),
+      .max_walk_duration_ = req->transfer_ppr_options()->duration_limit()};
 
   utl::verify(!q.start_.empty(), "no start edges");
   utl::verify(!q.destinations_[0].empty(), "no destination edges");

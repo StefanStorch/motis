@@ -532,13 +532,16 @@ msg_ptr intermodal::route(msg_ptr const& msg) {
                   ? router_
                   : "/routing"
             : req->router()->str();
+    auto profile = req->transfer_ppr_options()->profile()->c_str();
+    double duration_limit = req->transfer_ppr_options()->duration_limit();
 
     mc.create_and_finish(
         MsgContent_RoutingRequest,
         CreateRoutingRequest(mc, start.start_type_, start.start_, dest.station_,
                              req->search_type(), req->search_dir(),
                              mc.CreateVector(std::vector<Offset<Via>>{}),
-                             mc.CreateVector(edges))
+                             mc.CreateVector(edges),
+                             ppr::CreateSearchOptions(mc, mc.CreateString(profile), duration_limit))
             .Union(),
         router);
 

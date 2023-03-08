@@ -1,0 +1,21 @@
+include "base/Position.fbs";
+include "base/SearchDir.fbs";
+include "ppr/SearchOptions.fbs";
+
+namespace motis.ppr;
+
+enum OsmType : short {NODE = 0, WAY = 1, RELATION = 2}
+
+table FootRoutingIdRequest {
+  start: Position;
+  start_id: int;
+  start_type: OsmType;
+  destinations: [Position];
+  destination_ids: [int];
+  destination_types: [OsmType];
+  search_options: SearchOptions;
+  search_direction: SearchDir;
+  include_steps: bool;
+  include_edges: bool;
+  include_path: bool;
+}
