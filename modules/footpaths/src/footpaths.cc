@@ -1,6 +1,7 @@
 #include "motis/footpaths/footpaths.h"
 
 #include <iostream>
+#include <regex>
 
 #include "utl/verify.h"
 #include "utl/to_vec.h"
@@ -49,26 +50,15 @@ inline Position to_position(geo::latlng const& loc) {
   return {loc.lat_, loc.lng_};
 }
 
-inline Offset<FootpathsTrack> create_tracks(FlatBufferBuilder& fbb,
-                                      std::pair<track_info, double> const& info) {
-  auto const& track = info.first;
-  auto const pos = to_position(track.pos_);
-  auto const name = fbb.CreateString(track.name_);
-  return CreateFootpathsTrack(fbb, track.osm_id_, &pos, name);
-  /*if (lot.is_from_osm()) {
-    auto const& info = std::get<osm_parking_lot_info>(lot.info_);
-    auto const empty = fbb.CreateString("");
-    return CreateParking(fbb, lot.id_, &pos, static_cast<ParkingFee>(info.fee_),
-                         ParkingSource_OSM, empty, empty, empty);
-  } else if (lot.is_from_parkendd()) {
-    auto const& info = std::get<parkendd_parking_lot_info>(lot.info_);
-    return CreateParking(fbb, lot.id_, &pos, ParkingFee_UNKNOWN,
-                         ParkingSource_PARKENDD, fbb.CreateString(info.name_),
-                         fbb.CreateString(info.lot_type_),
-                         fbb.CreateString(info.address_));
-  } else {
-    throw utl::fail("unknown parking lot type");
-  }*/
+inline bool match_names(std::string const& l, std::string_view const& r) {
+  std::string left = std::regex_replace(
+      l, std::regex("[^0-9]+"), std::string("$1"));
+  std::string right = std::regex_replace(
+      std::string{r}, std::regex("[^0-9]+"), std::string("$1"));
+  if (right.length() == 0) {
+    return false;
+  }
+  return left == right;
 }
 
 struct footpaths::impl {
@@ -98,7 +88,6 @@ struct footpaths::impl {
 
 private:
   nigiri::timetable const& tt_;
-  //database db_;
   std::vector<ppr::profile_info> ppr_profiles_;
   tracks const& tracks_;
   bool ppr_exact_;
@@ -189,7 +178,7 @@ void footpaths::import(motis::module::import_dispatcher& reg) {
                         [](auto const& p) { return p->path()->str(); }),
             ppr_profiles_);
         for (auto& p : ppr_profiles_) {
-          p.second.profile_.duration_limit_ = max_walk_duration_ * 60;
+          p.second.profile_.duration_limit_ = max_walk_duration_;
         }
 
         std::vector<track_info> stations{};
@@ -218,51 +207,100 @@ void footpaths::import(motis::module::import_dispatcher& reg) {
           auto const loc_type = tt.locations_.types_[i];
           if (loc_type == nigiri::location_type::kTrack) {
             total++;
+            bool success = false;
+            int tries = 0;
             auto const coords = tt.locations_.coordinates_[i];
-            auto tracks = tracks_->get_tracks_in_radius(coords, 100);
-            for(auto& a_track : tracks) {
-              auto track = tracks_->get_track(a_track.first);
-              if (track->osm_id_ != -1 && track->name_ == tt.locations_.names_[i].view()) {
-                tt.locations_.osm_ids_[i] = nigiri::osm_node_id_t{track->osm_id_};
-                tt.locations_.osm_types_[i] = to_nigiri_osm(track->osm_type_);
-                if (track->idx_t_ == nigiri::location_idx_t::invalid()) {
-                  track->idx_t_ = i;
+            while (!success && (tries++ < 10)) {
+              auto tracks = tracks_->get_tracks_in_radius(coords, 40 * tries);
+              for (auto& a_track : tracks) {
+                auto track = tracks_->get_track(a_track.first);
+                // bus stops are only searched in 120 m radius
+                if (tries > 3 && track->bus_stop_) {
+                  continue;
                 }
-                found++;
-                break;
+                if (track->osm_id_ != -1 &&
+                    track->name_ == tt.locations_.names_[i].view()) {
+                  tt.locations_.osm_ids_[i] =
+                      nigiri::osm_node_id_t{track->osm_id_};
+                  tt.locations_.osm_types_[i] = to_nigiri_osm(track->osm_type_);
+                  if (track->idx_t_ == nigiri::location_idx_t::invalid()) {
+                    track->idx_t_ = i;
+                  }
+                  found++;
+                  success = true;
+                  break;
+                }
               }
+            }
+            // if the search wasn't successful try to only match the number of the track
+            if (!success) {
+              tries = 0;
+              while (!success && (tries++ < 10)) {
+                auto tracks = tracks_->get_tracks_in_radius(coords, 40 * tries);
+                for (auto& a_track : tracks) {
+                  auto track = tracks_->get_track(a_track.first);
+                  // bus stops are only searched in 120 m radius
+                  if (tries > 3 && track->bus_stop_) {
+                    continue;
+                  }
+                  if (track->osm_id_ != -1 &&
+                      match_names(track->name_, tt.locations_.names_[i].view())) {
+                    tt.locations_.osm_ids_[i] =
+                        nigiri::osm_node_id_t{track->osm_id_};
+                    tt.locations_.osm_types_[i] = to_nigiri_osm(track->osm_type_);
+                    if (track->idx_t_ == nigiri::location_idx_t::invalid()) {
+                      track->idx_t_ = i;
+                    }
+                    found++;
+                    success = true;
+                    break;
+                  }
+                }
+              }
+            }
+            if (!success) {
+              auto const name = tt.locations_.names_[i].view();
+              tracks_->tracks_.emplace_back(static_cast<std::string>(name), tt.locations_.coordinates_[i], i);
             }
           }
         }
         int track_count = 0, station_count = 0;
-        //nigiri::hash_map<nigiri::location_idx_t, bool> target;
-        std::clog << found << " of " << total << " tracks found\n";
+        LOG(info) << found << " of " << total << " tracks found";
+        /*for (auto const& p : ppr_profiles_) {
+          LOG(info) << "Profile: " << p.first
+                    << " querying for tracks that are "
+                    << p.second.profile_.walking_speed_ * max_walk_duration_
+                    << "m away";
+        }*/
+        int targets = 0, sources = 0;
         for (auto& track : tracks_->tracks_) {
-          if (track.idx_t_ == nigiri::location_idx_t::invalid() /*|| target.get(track.idx_t_)*/) {
+          if (track.idx_t_ == nigiri::location_idx_t::invalid()) {
             continue;
           }
           track.osm_id_ == -1 ? station_count++ : track_count++;
-          auto near_tracks = std::move(tracks_->get_tracks_in_radius(track.pos_, 200));
-          std::vector<track_info*> tracks_in_range{};
-          tracks_in_range.reserve(near_tracks.size());
-          for (auto const& near_track : near_tracks) {
-            auto to_add = tracks_->get_track(near_track.first);
-            if (to_add->idx_t_ == nigiri::location_idx_t::invalid()
-                || near_track.second < 1 || to_add->idx_t_ == track.idx_t_) {
-              continue;
+          for (auto const& p : ppr_profiles_) {
+            auto near_tracks = std::move(tracks_->get_tracks_in_radius(
+                track.pos_,
+                p.second.profile_.walking_speed_ * max_walk_duration_));
+            std::vector<track_info*> tracks_in_range{};
+            for (auto const& near_track : near_tracks) {
+              auto to_add = tracks_->get_track(near_track.first);
+              if (to_add->idx_t_ == nigiri::location_idx_t::invalid() ||
+                  to_add->idx_t_ == track.idx_t_) {
+                continue;
+              }
+              tracks_in_range.emplace_back(to_add);
+              targets++;
             }
-            //target.insert({to_add->idx_t_, true});
-            tracks_in_range.emplace_back(to_add);
-          }
-          if (!tracks_in_range.empty()) {
-            for (auto const& p : ppr_profiles_) {
-              auto task =
-                  foot_edge_task{&track, tracks_in_range, &(p.first)};
+            if (!tracks_in_range.empty()) {
+              sources++;
+              auto task = foot_edge_task{&track, tracks_in_range, &(p.first)};
               tasks.emplace_back(std::move(task));
             }
           }
         }
-        LOG(info) << "Tasks from " << track_count << " tracks and " << station_count << " stations";
+        LOG(info) << "Total targets: " << targets << " Targets per source: "
+                  << ((double)((double)targets) / ((double)sources)) << " Sources: " << sources;
         compute_foot_edges_direct(tasks, tt, ppr_profiles_, ppr_ev->graph_path()->str(),
                                   edge_rtree_max_size_, area_rtree_max_size_, lock_rtrees_,
                                   std::thread::hardware_concurrency(), ppr_exact_);

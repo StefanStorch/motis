@@ -15,9 +15,9 @@ enum class osm_type : std::uint8_t { NODE, WAY, RELATION};
 
 struct track_info {
   track_info() = default;
-  track_info(int64_t id, osm_type type,  std::string name, geo::latlng pos)
+  track_info(int64_t id, osm_type type,  std::string name, geo::latlng pos, bool bus_stop)
       : osm_id_(id), osm_type_(type), name_(std::move(name)), pos_(pos),
-        idx_t_(nigiri::location_idx_t::invalid()){}
+        idx_t_(nigiri::location_idx_t::invalid()), bus_stop_(bus_stop) {}
   track_info(int64_t id, osm_type type,  std::string name, geo::latlng pos,
              nigiri::location_idx_t idx_t)
       : osm_id_(id), osm_type_(type), name_(std::move(name)), pos_(pos), idx_t_(idx_t) {}
@@ -29,6 +29,7 @@ struct track_info {
   int64_t osm_id_{-1};
   osm_type osm_type_{osm_type::NODE};
   nigiri::location_idx_t idx_t_{nigiri::location_idx_t::invalid()};
+  bool bus_stop_{false};
 };
 
 struct tracks {

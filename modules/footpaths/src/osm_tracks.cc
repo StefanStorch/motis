@@ -71,8 +71,12 @@ private:
                     osmium::TagList const& tags) {
     //TODO maybe save multiple names per stop to get better matching results
     std::string in_name;
+    bool bus_stop = false;
     if (tags.has_key("name")) {
       in_name = tags.get_value_by_key("name");
+    }
+    if (tags.has_key("description")) {
+      in_name = tags.get_value_by_key("description");
     }
     if (tags.has_key("ref_name")) {
       in_name = tags.get_value_by_key("ref_name");
@@ -82,6 +86,11 @@ private:
     }
     if (tags.has_key("ref")) {
       in_name = tags.get_value_by_key("ref");
+    }
+    if (tags.has_key("highway")) {
+      if (strcmp(tags.get_value_by_key("highway"),"bus_stop") == 0) {
+        bus_stop = true;
+      }
     }
     std::vector<std::string> names{};
     boost::split(names, in_name, [](char c) {
@@ -95,12 +104,12 @@ private:
     }
     if (only_one) {
       tracks_.emplace_back(track_info{id, ot, in_name,
-                                      {coord.y, coord.x}});
+                                      {coord.y, coord.x}, bus_stop});
       return;
     }
     for (auto const& name : names) {
       tracks_.emplace_back(track_info{id, ot, name,
-                                      {coord.y, coord.x}});
+                                      {coord.y, coord.x}, bus_stop});
     }
   }
 
@@ -125,10 +134,6 @@ std::vector<track_info> extract_osm_tracks(std::string const& osm_file) {
   osmium::TagsFilter filter{false};
   filter.add_rule(true, "public_transport", "platform");
   filter.add_rule(true, "railway", "platform");
-  //filter.add_rule(true, "highway", "platform");
-  //filter.add_rule(true, "public_transport", "stop_area");
-  // filter.add_rule(true, "public_transport", "stop_area_group");
-  //filter.add_rule(true, "type", "public_transport");
 
   std::clog << "Extract OSM tracks: Pass 1..." << std::endl;
 

@@ -1,7 +1,6 @@
 #include <cmath>
 #include <algorithm>
 #include <functional>
-#include <optional>
 #include <string>
 
 #include "utl/progress_tracker.h"
@@ -11,13 +10,12 @@
 #include "ppr/serialization/reader.h"
 
 #include "motis/core/common/logging.h"
-#include "motis/core/schedule/time.h"
 
-#include "motis/module/context/motis_call.h"
 #include "motis/module/context/motis_parallel_for.h"
 
 #include "motis/footpaths/foot_edges.h"
 #include "motis/footpaths/thread_pool.h"
+#include "boost/thread/mutex.hpp"
 
 using namespace flatbuffers;
 using namespace motis::logging;
@@ -77,22 +75,90 @@ search_result route_ppr_direct(
                      profile, dir);
 }
 
-/*std::vector<std::vector<foot_edge_info>> route_ppr_module(
-    location const& parking_loc, std::vector<location> const& station_locs,
-    std::string const& profile_name, search_profile const& profile,
-    search_direction const dir) {
-  using namespace ppr;
-  auto const req = make_ppr_request(
-      parking_loc, station_locs, profile_name, profile.duration_limit_,
-      dir == search_direction::FWD ? SearchDir_Forward : SearchDir_Backward);
-  auto const msg = motis_call(req)->val();
-  auto const ppr_res = motis_content(FootRoutingResponse, msg);
-  return utl::to_vec(*ppr_res->routes(), [&](auto const& routes) {
-    return utl::to_vec(*routes->routes(), [&](auto const& r) {
-      return foot_edge_info{r->duration(), r->accessibility(), r->distance()};
-    });
-  });
-}*/
+void print_footpath_information(nigiri::timetable& tt, int n) {
+  size_t station_footpaths = 0, track_footpaths = 0,  num_footpaths = 0;
+  int station_count = 0, track_count = 0;
+  int station_total = 0, track_total = 0;
+  for (auto i = nigiri::location_idx_t{0U};
+       i != tt.locations_.ids_.size(); ++i) {
+    num_footpaths += tt.locations_.footpaths_out_[0][i].size();
+    auto const loc_type = tt.locations_.types_[i];
+    if (loc_type == nigiri::location_type::kStation) {
+      station_total++;
+      if (tt.locations_.footpaths_out_[n][i].empty()) {
+        station_count++;
+      } else {
+        station_footpaths += tt.locations_.footpaths_out_[n][i].size();
+      }
+      continue;
+    }
+    if (loc_type == nigiri::location_type::kTrack) {
+      track_total++;
+      if (tt.locations_.footpaths_out_[n][i].empty()) {
+        track_count++;
+      } else {
+        track_footpaths += tt.locations_.footpaths_out_[n][i].size();
+      }
+      continue;
+    }
+  }
+  LOG(info) << "Total Footpaths: " << num_footpaths << " Footpaths per location: " << (double)num_footpaths/(double)tt.locations_.ids_.size();
+  LOG(info) << "Station Footpaths: " << station_footpaths << " Footpaths per station: " << (double)station_footpaths/(double)station_total;
+  LOG(info) << "Footpaths per station(at least 1): " << (double)station_footpaths/(double)(station_total-station_count);
+  LOG(info) << "Stations that don't have an outgoing footpath " << station_count << " of " << station_total;
+  LOG(info) << "Track Footpaths: " << track_footpaths << " Footpaths per track: " << (double)track_footpaths/(double)track_total;
+  LOG(info) << "Footpaths per track(at least 1): " << (double)track_footpaths/(double)(track_total-track_count);
+  LOG(info) << "Tracks that don't have an outgoing footpath " << track_count << " of " << track_total;
+}
+
+void print_routing_information(search_result const& result, std::string const& profile_name,
+                               track_info* const track, ::routing::osm_type const& type,
+                               std::vector<::routing::osm_type> const& destination_types,
+                               std::vector<location> const& destination_locs,
+                               std::vector<int64_t> const& destination_ids, bool const dijkstra) {
+  LOG(info) << "Benutztes Profil: " << profile_name;
+  int attempts = result.stats_.attempts_;
+  if (attempts > 1 && dijkstra) {
+    LOG(info) << "Attempts: " << attempts;
+    LOG(info) << "Start extended: " << result.stats_.d_start_pts_extended_;
+    LOG(info) << "Destination extended: " << result.stats_.d_destination_pts_extended_;
+  }
+  std::string printable_type = type == ::routing::osm_type::NODE ? "NODE" : type == ::routing::osm_type::EDGE ? "EDGE" : "AREA";
+  std::vector<std::string> printable_types;
+  for (auto const& d_type : destination_types) {
+    printable_types.emplace_back(d_type == ::routing::osm_type::NODE ? "NODE" : d_type == ::routing::osm_type::EDGE ? "EDGE" : "AREA");
+  }
+  LOG(info) << "Zeit bis Startpunkt gefunden wurde:"
+            << result.stats_.d_start_pts_ << " " << printable_type << " " << track->osm_id_;
+  if (result.stats_.start_is_location) {
+    LOG(info) << "Start ist Location";
+  }
+  LOG(info) << "Zeit pro Zielpunkt:"
+            << result.stats_.d_destination_pts_ / destination_locs.size();
+  for(auto const& d : result.stats_.destination_is_location) {
+    if (d) {
+      LOG(info) << "Mindestens 1 Ziel ist Location";
+      break;
+    }
+  }
+  if (dijkstra) {
+    for (auto const& dijkstra_stat : result.stats_.dijkstra_statistics_) {
+      LOG(info) << "Dijkstra Zeit: " << dijkstra_stat.d_total_;
+      LOG(info) << "  Reached " << dijkstra_stat.goals_reached_ << " of "
+                << dijkstra_stat.goals_ << " goals";
+      LOG(info) << "  STARTS: " << dijkstra_stat.d_starts_;
+      LOG(info) << "  GOALS: " << dijkstra_stat.d_goals_;
+      LOG(info) << "  AREA_EDGES: " << dijkstra_stat.d_area_edges_;
+      LOG(info) << "  LABELS TO ROUTE: " << dijkstra_stat.d_labels_to_route_;
+      LOG(info) << "  SEARCH: " << dijkstra_stat.d_search_;
+    }
+  }
+  LOG(info) << "Start: " << track->pos_;
+  for(int i = 0; i < destination_locs.size(); ++i) {
+    LOG(info) << "Ziel: " << destination_locs[i] << " " << destination_ids[i] << " " << printable_types[i];
+  }
+  LOG(info) << "Zeit für die gesamte Anfrage: " << result.stats_.d_total_ << "\n";
+}
 
 using route_fn_t = std::function<search_result(
     int64_t const& /*start_id*/,
@@ -107,20 +173,21 @@ using route_fn_t = std::function<search_result(
 void compute_edges(
     foot_edge_task const& task, nigiri::timetable& tt,
     std::map<std::string, motis::ppr::profile_info> const& ppr_profiles,
-    bool const /*ppr_exact*/, route_fn_t const& route_fn) {
+    bool const /*ppr_exact*/, route_fn_t const& route_fn, boost::mutex& mutex) {
   auto const& track = task.track_;
   auto const idx = task.track_->idx_t_;
   auto const& profile_name = *task.ppr_profile_;
   search_profile profile;
+  int profile_number;
   auto it = ppr_profiles.find(profile_name);
   if (it != end(ppr_profiles)) {
     profile = it->second.profile_;
+    profile_number = tt.locations_.profile_.at(profile_name);
   } else {
     profile = ppr_profiles.begin()->second.profile_;
+    profile_number = 0;
   }
-  int profile_number = tt.locations_.profile_.at(profile_name);
   if (!task.tracks_in_radius_.empty()) {
-    //LOG(info) << "loading destination";
     auto const destination_ids = utl::to_vec(
         task.tracks_in_radius_,
         [](auto const& s) { return s->osm_id_; });
@@ -135,77 +202,34 @@ void compute_edges(
                                      destination_ids, destination_locs, destination_types,
                                      profile_name, profile, search_direction::FWD);
     if (result.stats_.d_total_ > 1000) {
-      std::string printable_type = type == ::routing::osm_type::NODE ? "NODE" : type == ::routing::osm_type::EDGE ? "EDGE" : "AREA";
-      std::vector<std::string> printable_types;
-      for (auto const& d_type : destination_types) {
-        printable_types.emplace_back(d_type == ::routing::osm_type::NODE ? "NODE" : d_type == ::routing::osm_type::EDGE ? "EDGE" : "AREA");
-      }
-      LOG(info) << "Zeit bis Startpunkt gefunden wurde:"
-                << result.stats_.d_start_pts_ << " " << printable_type << " " << track->osm_id_;
-      if (result.stats_.start_is_location) {
-        LOG(info) << "Start ist Location";
-      }
-      LOG(info) << "Zeit pro Zielpunkt:"
-                << result.stats_.d_destination_pts_ / destination_locs.size()
-                << " " << printable_types;
-      for(auto const& d : result.stats_.destination_is_location) {
-        if (d) {
-          LOG(info) << "Destination ist Location";
-          break;
-        }
-      }
-      LOG(info) << "Zeit für die gesamte Anfrage: " << result.stats_.d_total_;
+      //print_routing_information(result, profile_name, track, type, destination_types, destination_locs, destination_ids, true);
     }
     auto const fwd_result = to_foot_edge_info(result);
-    //LOG(info) << "successfully computed: " << fwd_result.size() << " footpaths to "
-    //   << destination_locs.size() << " destinations";
-    //assert(fwd_result.size() == task.tracks_in_radius_.size());
+    assert(fwd_result.size() == task.tracks_in_radius_.size());
     if (fwd_result.empty()) {
-      LOG(info) << "Did not find a route from: " << track->osm_id_ << " " << track->pos_ << " to " << destination_ids.at(0) << " " << destination_locs.at(0);
       return;
     }
-    /*LOG(info) << "The routes found are: ";
-    for (auto const& routes : fwd_result) {
-      for (auto const& r : routes) {
-        LOG(info) << r.duration_ << " " << r.accessibility_ << " " << r.distance_;
-      }
-    }*/
+    if (result.destinations_reached() == 0) {
+      //print_routing_information(result, profile_name, track, type, destination_types, destination_locs, destination_ids, false);
+      return;
+    }
     for (auto station_idx = 0U; station_idx < task.tracks_in_radius_.size();
          ++station_idx) {
-      //LOG(info) << "getting the first station";
       auto const& fwd_routes = fwd_result[station_idx];
-      //LOG(info) << "The station is: " << task.tracks_in_radius_.at(station_idx).first.name_;
       auto const& target_idx = task.tracks_in_radius_[station_idx]->idx_t_;
-      //LOG(info) << "It has the id: " << target_idx;
       if (fwd_routes.empty()) {
-        //LOG(info) << "Did not find a route to this station!";
-        //LOG(info) << "The start is: " << task.track_->name_ << " with id " << task.track_->osm_id_;
-        //LOG(info) << "The destination is: " << task.tracks_in_radius_.at(station_idx)->name_ << " with id " << task.tracks_in_radius_.at(station_idx)->osm_id_;
         continue;
       }
-      //LOG(info) << "found " << fwd_routes.size() << " routes to this location";
-      //LOG(info) << "is it really necessary to loop over all the available routes?";
       for(auto const& r : fwd_routes) {
-        //LOG(info) << "writing the footpaths into the timetable";
-        //LOG(info) << "from: " << idx << " to " << target_idx;
-        //LOG(info) << "The start is: " << task.track_->name_ << " with id " << task.track_->osm_id_;
-        //LOG(info) << "The destination is: " << task.tracks_in_radius_.at(station_idx)->name_ << " with id " << task.tracks_in_radius_.at(station_idx)->osm_id_;
         auto const from_transfer_time = tt.locations_.transfer_time_[idx];
-        //LOG(info) << "From Transfer time: " << from_transfer_time;
         auto const to_transfer_time = tt.locations_.transfer_time_[target_idx];
-        //LOG(info) << "To transfer time: " << to_transfer_time;
-        //LOG(info) << "Footpath transfer time: " << r.duration_;
         auto const duration =
             std::max({from_transfer_time, to_transfer_time, r.duration_});
-        //LOG(info) << "Final transfer time: " << duration;
-        //LOG(info) << "the start node is: " << tt.locations_.osm_ids_[idx].v_;
-        //LOG(info) << "the destination node is: " << tt.locations_.osm_ids_[target_idx].v_;
+        boost::unique_lock<boost::mutex> scoped_lock(mutex);
         tt.locations_.footpaths_out_[profile_number][idx].emplace_back(target_idx, duration);
-        tt.locations_.footpaths_out_[profile_number][target_idx].emplace_back(idx, duration);
-        //LOG(info) << "written into outgoing";
+        //tt.locations_.footpaths_out_[profile_number][target_idx].emplace_back(idx, duration);
         tt.locations_.footpaths_in_[profile_number][target_idx].emplace_back(idx, duration);
-        tt.locations_.footpaths_in_[profile_number][idx].emplace_back(target_idx, duration);
-        //LOG(info) << "written into incoming";
+        //tt.locations_.footpaths_in_[profile_number][idx].emplace_back(target_idx, duration);
       }
     }
   }
@@ -236,7 +260,6 @@ void compute_foot_edges_direct( std::vector<foot_edge_task> const& tasks,
 
   auto progress_tracker = utl::get_active_progress_tracker();
   progress_tracker->reset_bounds().in_high(tasks.size());
-  //thread_pool pool{static_cast<unsigned>(std::max(1, threads))};
   auto const route_fn = [&](int64_t const& start_id,
                             location const& start_loc,
                             ::routing::osm_type const& type,
@@ -258,19 +281,21 @@ void compute_foot_edges_direct( std::vector<foot_edge_task> const& tasks,
     tt.locations_.footpaths_in_[i].clear();
     tt.locations_.footpaths_in_[i][nigiri::location_idx_t{tt.locations_.src_.size() - 1}];
   }
-  //LOG(info) << "Starting thread creation.";
-  /*for (auto const& t : tasks) {
+  LOG(info) << "Starting thread creation.";
+  thread_pool pool{static_cast<unsigned>(std::max(1, threads))};
+  boost::mutex mutex;
+  for (auto const& t : tasks) {
     pool.post([&, &t = t] {
       progress_tracker->increment();
-      compute_edges(t, tt, ppr_profiles, ppr_exact, route_fn);
+      compute_edges(t, tt, ppr_profiles, ppr_exact, route_fn, mutex);
     });
-  }*/
-  LOG(info) << "Starting footpaths computation.";
-  int count = 0;
-  int next_print = 1024;
+  }
+  LOG(info) << "Starting footpaths computation with " << std::max(1, threads) << " Threads";
+  pool.join();
+  /*int count = 0;
+  int next_print =  tasks.size() / 20 + 1;
   for (auto const& t : tasks) {
-    if (++count % (next_print) == 0) {
-      next_print *= 2;
+    if (++count % next_print == 0) {
       LOG(info) << count << " footpaths computed "
                 << std::chrono::duration_cast<std::chrono::duration<double, std::milli>>
                        (std::chrono::steady_clock::now() - timer.start_).count() / count
@@ -278,57 +303,20 @@ void compute_foot_edges_direct( std::vector<foot_edge_task> const& tasks,
     }
     progress_tracker->increment();
     compute_edges(t, tt, ppr_profiles, ppr_exact, route_fn);
-  }
+  }*/
   auto time = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>
               (std::chrono::steady_clock::now() - timer.start_).count();
-  LOG(info) << count << " footpaths computed "
-            << time / count
+  LOG(info) << tasks.size() << " footpaths computed "
+            << time / tasks.size()
             << "ms per footpath.";
+  time /= 1000;
   LOG(info) << "Took " << time << "s or " << time / 60 << "m or " << time / 3600 << "h";
-  //pool.join();
-  /*LOG(info) << "Inserting the footpaths that did not change";
-  for (int i = 0; i < tt.locations_.footpaths_out_.size(); ++i) {
-    //LOG(info) << "Inserting into footpaths at: " << i;
-    for (auto l = nigiri::location_idx_t{0U};
-         l != tt.locations_.footpaths_out_[i].size(); ++l) {
-      //LOG(info) << "Inserting for target: " << l;
-      if (precomputing.at(l.v_)) {
-        for (auto const& fp : tt.locations_.footpaths_out_[l]) {
-          auto return_path = nigiri::footpath{l, fp.duration_};
-          tt.locations_.footpaths_in_[fp.target_].emplace_back(return_path);
-        }
-        continue;
-      }
-      for (auto const& fp : fp_tmp[l]) {
-        //LOG(info) << "Inserting for source: " << fp.target_;
-        auto return_path = nigiri::footpath{l, fp.duration_};
-        if (precomputing.at(l.v_) && precomputing.at(fp.target_.v_)) {
-          LOG(info) << "skipping";
-          continue;
-        }
-        tt.locations_.footpaths_out_[i][l].emplace_back(fp);
-        tt.locations_.footpaths_in_[i][fp.target_].emplace_back(return_path);
-      }
-    }
-  }*/
   LOG(info) << "Footpaths precomputed.";
+  for (int i = 0; i < tt.locations_.profile_.size(); ++i) {
+    LOG(info) << " Profil number: " << i;
+    print_footpath_information(tt, i);
+  }
 }
 
-/*void compute_foot_edges_via_module(std::vector<foot_edge_task> const& tasks,
-    std::map<std::string, motis::ppr::profile_info> const& ppr_profiles,
-    bool ppr_exact) {
-  scoped_timer timer{"compute foot edges"};
-  auto const route_fn = [&](location const& parking_loc,
-                            std::vector<location> const& station_locs,
-                            std::string const& profile_name,
-                            search_profile const& profile,
-                            search_direction const dir) {
-    return route_ppr_module(parking_loc, station_locs, profile_name, profile,
-                            dir);
-  };
-  motis_parallel_for(tasks, [&](foot_edge_task const& task) {
-    compute_edges(task, ppr_profiles, ppr_exact, route_fn);
-  });
-}*/
 
 }  // namespace motis::footpaths

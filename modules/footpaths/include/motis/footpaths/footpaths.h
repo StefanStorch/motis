@@ -23,7 +23,7 @@ struct footpaths : public motis::module::module {
   bool import_successful() const override { return import_successful_; }
 
 private:
-  int max_walk_duration_{10};
+  int max_walk_duration_{600};
   std::size_t edge_rtree_max_size_{1024UL * 1024 * 1024 * 3};
   std::size_t area_rtree_max_size_{1024UL * 1024 * 1024};
   bool lock_rtrees_{false};
